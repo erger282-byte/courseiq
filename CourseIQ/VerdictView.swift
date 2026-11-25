@@ -57,9 +57,6 @@ struct VerdictBanner: View {
         }
     }
 
-    static func fr(_ n: Double, _ dec: Int = 2) -> String {
-        String(format: "%.\(dec)f", locale: Locale(identifier: "fr_FR"), n)
-    }
 }
 
 func fr(_ n: Double, _ dec: Int = 2) -> String {
