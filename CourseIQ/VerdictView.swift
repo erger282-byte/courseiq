@@ -29,7 +29,7 @@ struct VerdictBanner: View {
                     Text("COURSE")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.secondary)
-                    Text("\(result.tCourse) min · \(fr(result.dCourse, 1)) km")
+                    Text("\(result.estime ? "~" : "")\(result.tCourse) min\(result.estime ? " (est.)" : "") · \(fr(result.dCourse, 1)) km")
                         .font(.system(size: 16, weight: .bold))
                 }
                 .frame(maxWidth: .infinity)
