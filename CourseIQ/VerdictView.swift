@@ -14,6 +14,31 @@ struct VerdictBanner: View {
 
     var body: some View {
         VStack(spacing: 14) {
+            // Panneau inspiré de Ride_IQ : prise en charge vs course
+            HStack(spacing: 0) {
+                VStack(spacing: 4) {
+                    Text("PRISE EN CHARGE")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    Text("\(result.tApproche) min · \(fr(result.dApproche, 1)) km")
+                        .font(.system(size: 16, weight: .bold))
+                }
+                .frame(maxWidth: .infinity)
+                Rectangle().fill(Color.white.opacity(0.15)).frame(width: 1, height: 34)
+                VStack(spacing: 4) {
+                    Text("COURSE")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    Text("\(result.tCourse) min · \(fr(result.dCourse, 1)) km")
+                        .font(.system(size: 16, weight: .bold))
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .padding(.vertical, 12)
+            .background(Color.orange.opacity(0.12))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.orange.opacity(0.5), lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+
             VStack(spacing: 6) {
                 Text(result.verdict.label)
                     .font(.system(size: 28, weight: .heavy))
