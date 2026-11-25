@@ -1,0 +1,43 @@
+name: Build IPA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build without signing
+        run: |
+          xcodebuild -project CourseIQ.xcodeproj \
+            -scheme CourseIQ \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath ./build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+
+      - name: Package IPA
+        run: |
+          APP=$(find ./build -name "CourseIQ.app" -path "*Release-iphoneos*" | head -1)
+          echo "App bundle: $APP"
+          mkdir -p out/Payload
+          cp -r "$APP" out/Payload/
+          cd out && zip -qr CourseIQ.ipa Payload && cd ..
+          ls -la out/CourseIQ.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CourseIQ-ipa
+          path: out/CourseIQ.ipa
+          retention-days: 30

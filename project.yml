@@ -1,0 +1,39 @@
+name: CourseIQ
+options:
+  bundleIdPrefix: com.courseiq
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+targets:
+  CourseIQ:
+    type: application
+    platform: iOS
+    sources:
+      - path: CourseIQ
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.courseiq.app
+        INFOPLIST_FILE: CourseIQ/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_VERSION: "5.0"
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+    dependencies:
+      - target: CourseIQShare
+  CourseIQShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: CourseIQShare
+      - path: CourseIQ/Analysis.swift
+      - path: CourseIQ/VerdictView.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.courseiq.app.share
+        INFOPLIST_FILE: CourseIQShare/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_VERSION: "5.0"
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
