@@ -2,12 +2,6 @@ workflows:
   ios-ipa:
     name: Build IPA
     instance_type: mac_mini_m2
-    triggering:
-      events:
-        - push
-      branch_patterns:
-        - pattern: 'main'
-          include: true
     environment:
       xcode: latest
     scripts:
