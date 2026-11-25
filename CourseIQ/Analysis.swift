@@ -53,6 +53,10 @@ struct AnalysisResult {
     var euroHeure: Double
     var euroKm: Double
     var verdict: Verdict
+    var tApproche: Int
+    var dApproche: Double
+    var tCourse: Int
+    var dCourse: Double
 }
 
 enum Analyzer {
@@ -79,7 +83,9 @@ enum Analyzer {
         }
         return AnalysisResult(km: km, minutes: Int(minutes.rounded()), commission: commission,
                               carburant: carburant, fixes: fixes, approche: approche,
-                              net: net, euroHeure: euroHeure, euroKm: euroKm, verdict: verdict)
+                              net: net, euroHeure: euroHeure, euroKm: euroKm, verdict: verdict,
+                              tApproche: Int(i.tApproche.rounded()), dApproche: i.dApproche,
+                              tCourse: Int(i.tCourse.rounded()), dCourse: i.dCourse)
     }
 
     static func explication(_ s: Settings, _ r: AnalysisResult) -> String {
@@ -113,6 +119,13 @@ enum Analyzer {
         if let m = firstMatch(#"à\s*\d+\s*min\s*\((\d+[.,]\d+)\s*km"#, in: text) {
             input.dApproche = parseFr(m)
         }
+        // Autre format Uber : "8 min (à 2,2 km)"
+        if input.tApproche == 0, let m = firstMatch(#"(\d+)\s*min\s*\(\s*à\s*\d"#, in: text) {
+            input.tApproche = Double(m) ?? 0
+        }
+        if input.dApproche == 0, let m = firstMatch(#"\(\s*à\s*(\d+[.,]\d+)\s*km"#, in: text) {
+            input.dApproche = parseFr(m)
+        }
         // Course : "Course de 9.7 km"
         if let m = firstMatch(#"[Cc]ourse\s+de\s+(\d+[.,]\d+)\s*km"#, in: text) {
             input.dCourse = parseFr(m)
@@ -120,6 +133,10 @@ enum Analyzer {
         // Durée éventuelle : "23min ↔ 12.0 km"
         if let m = firstMatch(#"(\d+)\s*min\s*[↔\-–>]+\s*\d"#, in: text) {
             input.tCourse = Double(m) ?? 0
+        }
+        // Uber affiche souvent « Montant net de frais » : la commission est déjà déduite
+        if text.range(of: "net de frais", options: .caseInsensitive) != nil {
+            input.netFrais = true
         }
         return input
     }
