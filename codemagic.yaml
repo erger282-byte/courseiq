@@ -1,0 +1,38 @@
+workflows:
+  ios-ipa:
+    name: Build IPA
+    instance_type: mac_mini_m2
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: 'main'
+          include: true
+    environment:
+      xcode: latest
+    scripts:
+      - name: Install XcodeGen
+        script: brew install xcodegen
+      - name: Generate Xcode project
+        script: xcodegen generate
+      - name: Build unsigned
+        script: |
+          xcodebuild -project CourseIQ.xcodeproj \
+            -scheme CourseIQ \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath ./build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+      - name: Package IPA
+        script: |
+          APP=$(find ./build -name "CourseIQ.app" -path "*Release-iphoneos*" | head -1)
+          echo "App bundle: $APP"
+          mkdir -p out/Payload
+          cp -r "$APP" out/Payload/
+          cd out && zip -qr CourseIQ.ipa Payload && cd ..
+          ls -la out/CourseIQ.ipa
+    artifacts:
+      - out/CourseIQ.ipa
