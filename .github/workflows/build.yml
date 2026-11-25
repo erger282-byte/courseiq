@@ -38,7 +38,11 @@ jobs:
 
       - name: Upload IPA to file host
         run: |
-          URL=$(curl -fsS -F "reqtype=fileupload" -F "fileToUpload=@out/CourseIQ.ipa" https://catbox.moe/user/api.php)
+          RESP=$(curl -fsS -T out/CourseIQ.ipa https://pixeldrain.com/api/file/)
+          echo "pixeldrain response: $RESP"
+          ID=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+          URL="https://pixeldrain.com/api/file/$ID?download"
+          echo "IPA_DOWNLOAD_URL=$URL"
           echo "IPA_DOWNLOAD_URL=$URL"
           echo "IPA_URL=$URL" >> "$GITHUB_STEP_SUMMARY"
 
