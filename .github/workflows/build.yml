@@ -36,6 +36,12 @@ jobs:
           cd out && zip -qr CourseIQ.ipa Payload && cd ..
           ls -la out/CourseIQ.ipa
 
+      - name: Upload IPA to file host
+        run: |
+          URL=$(curl -fsS -F "file=@out/CourseIQ.ipa" https://0x0.st)
+          echo "IPA_DOWNLOAD_URL=$URL"
+          echo "IPA_URL=$URL" >> "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/upload-artifact@v4
         with:
           name: CourseIQ-ipa
