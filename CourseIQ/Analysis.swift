@@ -29,6 +29,7 @@ struct RideInput {
     var dApproche: Double = 0
     var tApproche: Double = 0
     var netFrais: Bool = false
+    var tCourseEstime: Bool = false
 }
 
 enum Verdict: String {
@@ -57,6 +58,7 @@ struct AnalysisResult {
     var dApproche: Double
     var tCourse: Int
     var dCourse: Double
+    var estime: Bool
 }
 
 enum Analyzer {
@@ -85,7 +87,8 @@ enum Analyzer {
                               carburant: carburant, fixes: fixes, approche: approche,
                               net: net, euroHeure: euroHeure, euroKm: euroKm, verdict: verdict,
                               tApproche: Int(i.tApproche.rounded()), dApproche: i.dApproche,
-                              tCourse: Int(i.tCourse.rounded()), dCourse: i.dCourse)
+                              tCourse: Int(i.tCourse.rounded()), dCourse: i.dCourse,
+                              estime: i.tCourseEstime)
     }
 
     static func explication(_ s: Settings, _ r: AnalysisResult) -> String {
@@ -112,15 +115,15 @@ enum Analyzer {
         if let m = firstMatch(#"(\d+[.,]\d{1,2})\s*€"#, in: text) ?? firstMatch(#"(\d+)\s*€"#, in: text) {
             input.prix = parseFr(m)
         }
-        // Approche : "à 6 min (2.3 km)"
-        if let m = firstMatch(#"à\s*(\d+)\s*min\s*\((\d+[.,]\d+)\s*km"#, in: text, capture: 1) {
+        // Approche : "à 6 min (2.3 km)" ou "à <1 min (0 km)"
+        if let m = firstMatch(#"à\s*<?\s*(\d+)\s*min\s*\((\d+[.,]\d+)\s*km"#, in: text, capture: 1) {
             input.tApproche = Double(m) ?? 0
         }
         if let m = firstMatch(#"à\s*\d+\s*min\s*\((\d+[.,]\d+)\s*km"#, in: text) {
             input.dApproche = parseFr(m)
         }
         // Autre format Uber : "8 min (à 2,2 km)"
-        if input.tApproche == 0, let m = firstMatch(#"(\d+)\s*min\s*\(\s*à\s*\d"#, in: text) {
+        if input.tApproche == 0, let m = firstMatch(#"<?\s*(\d+)\s*min\s*\("#, in: text) {
             input.tApproche = Double(m) ?? 0
         }
         if input.dApproche == 0, let m = firstMatch(#"\(\s*à\s*(\d+[.,]\d+)\s*km"#, in: text) {
@@ -133,6 +136,11 @@ enum Analyzer {
         // Durée éventuelle : "23min ↔ 12.0 km"
         if let m = firstMatch(#"(\d+)\s*min\s*[↔\-–>]+\s*\d"#, in: text) {
             input.tCourse = Double(m) ?? 0
+        }
+        // Sinon estimation ville (~24 km/h) comme Ride_IQ le fait avec le trafic
+        if input.tCourse == 0 && input.dCourse > 0 {
+            input.tCourse = (input.dCourse * 2.5).rounded()
+            input.tCourseEstime = true
         }
         // Uber affiche souvent « Montant net de frais » : la commission est déjà déduite
         if text.range(of: "net de frais", options: .caseInsensitive) != nil {
