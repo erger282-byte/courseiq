@@ -20,6 +20,7 @@ struct Settings {
     var kmMois: Double = 4000
     var tauxCom: Double = 25       // %
     var cible: Double = 20         // €/h net visé
+    var minParKm: Double = 3.0     // estimation de secours, ajustable dans les réglages
 }
 
 struct RideInput {
@@ -30,6 +31,9 @@ struct RideInput {
     var tApproche: Double = 0
     var netFrais: Bool = false
     var tCourseEstime: Bool = false
+    var adresseDepart: String = ""
+    var adresseArrivee: String = ""
+    var note: Double = 0
 }
 
 enum Verdict: String {
@@ -75,12 +79,16 @@ enum Analyzer {
         let net = i.prix - commission - carburant - fixes
         let euroHeure = heures > 0 ? net / heures : net
         let euroKm = km > 0 ? net / km : net
-        let verdict: Verdict
+        var verdict: Verdict
         if net <= 0 || euroHeure < s.cible * 0.5 {
             verdict = .perte
         } else if euroHeure >= s.cible {
             verdict = .rentable
         } else {
+            verdict = .evaluer
+        }
+        // Durée estimée au repli min/km : jamais de verdict vert, par prudence.
+        if verdict == .rentable && i.tCourseEstime {
             verdict = .evaluer
         }
         return AnalysisResult(km: km, minutes: Int(minutes.rounded()), commission: commission,
@@ -109,6 +117,8 @@ enum Analyzer {
     }
 
     /// Lit le texte OCR d'une capture d'offre Uber et pré-remplit ce qu'il trouve.
+    /// Ne calcule AUCUNE durée de course : c'est le rôle de RouteService (Apple Plans)
+    /// ou du repli réglable min/km appliqué par l'appelant.
     static func parseOffer(text: String) -> RideInput {
         var input = RideInput()
         // Prix : "9 €", "9,50 €", "12.40€"
@@ -133,19 +143,34 @@ enum Analyzer {
         if let m = firstMatch(#"[Cc]ourse\s+de\s+(\d+[.,]\d+)\s*km"#, in: text) {
             input.dCourse = parseFr(m)
         }
-        // Durée éventuelle : "23min ↔ 12.0 km"
+        // Durée éventuelle affichée par Uber : "23min ↔ 12.0 km"
         if let m = firstMatch(#"(\d+)\s*min\s*[↔\-–>]+\s*\d"#, in: text) {
             input.tCourse = Double(m) ?? 0
-        }
-        // Sinon estimation ville (~24 km/h) comme Ride_IQ le fait avec le trafic
-        if input.tCourse == 0 && input.dCourse > 0 {
-            input.tCourse = (input.dCourse * 2.5).rounded()
-            input.tCourseEstime = true
         }
         // Uber affiche souvent « Montant net de frais » : la commission est déjà déduite
         if text.range(of: "net de frais", options: .caseInsensitive) != nil {
             input.netFrais = true
         }
+        // Note du client : "4,85 ★" ou "★ 4,85"
+        if let m = firstMatch(#"(\d[.,]\d{1,2})\s*★"#, in: text) ?? firstMatch(#"★\s*(\d[.,]\d{1,2})"#, in: text) {
+            input.note = parseFr(m)
+        }
+        // Adresses : lignes avec code postal ou commençant par un numéro + type de voie.
+        // La première trouvée est le départ (prise en charge), la seconde l'arrivée.
+        let lignes = text.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        var adresses: [String] = []
+        for ligne in lignes {
+            let codePostal = ligne.range(of: #"\b\d{5}\b"#, options: .regularExpression) != nil
+            let numeroVoie = ligne.range(of: #"^\d{1,4}\s+(rue|avenue|av|boulevard|bd|place|chemin|allée|allee|impasse|route|quai|cours|square|passage)\b"#,
+                                         options: [.regularExpression, .caseInsensitive]) != nil
+            if (codePostal || numeroVoie) && !adresses.contains(ligne) {
+                adresses.append(ligne)
+            }
+        }
+        if !adresses.isEmpty { input.adresseDepart = adresses[0] }
+        if adresses.count > 1 { input.adresseArrivee = adresses[1] }
         return input
     }
 

@@ -28,6 +28,7 @@ targets:
       - path: CourseIQShare
       - path: CourseIQ/Analysis.swift
       - path: CourseIQ/VerdictView.swift
+      - path: CourseIQ/RouteService.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.courseiq.app.share

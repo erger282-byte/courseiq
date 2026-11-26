@@ -8,6 +8,7 @@ struct ContentView: View {
     @AppStorage("kmMois") private var kmMois: Double = 4000
     @AppStorage("tauxCom") private var tauxCom: Double = 25
     @AppStorage("cible") private var cible: Double = 20
+    @AppStorage("minParKm") private var minParKm: Double = 3.0
 
     @State private var prix: String = ""
     @State private var dCourse: String = ""
@@ -20,40 +21,37 @@ struct ContentView: View {
 
     private var settings: Settings {
         Settings(motor: Motor(rawValue: motorRaw) ?? .essence, conso: conso, prixEnergie: prixEnergie,
-                 charges: charges, kmMois: kmMois, tauxCom: tauxCom, cible: cible)
+                 charges: charges, kmMois: kmMois, tauxCom: tauxCom, cible: cible, minParKm: minParKm)
     }
 
     private var input: RideInput {
-        RideInput(prix: num(prix), dCourse: num(dCourse), tCourse: num(tCourse),
-                  dApproche: num(dApproche), tApproche: num(tApproche), netFrais: netFrais)
+        var i = RideInput(prix: num(prix), dCourse: num(dCourse), tCourse: num(tCourse),
+                          dApproche: num(dApproche), tApproche: num(tApproche), netFrais: netFrais)
+        // Saisie manuelle sans adresses : si la durée n'est pas donnée,
+        // repli au min/km réglable (valeur prudente), marqué « durée estimée ».
+        if i.tCourse == 0 && i.dCourse > 0 {
+            i.tCourse = (i.dCourse * minParKm).rounded()
+            i.tCourseEstime = true
+        }
+        return i
     }
 
     private var result: AnalysisResult? { Analyzer.analyse(settings, input) }
-    private var totalMinutes: Int { Int(num(tCourse) + num(tApproche)) }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    // Mode rapide : temps de trajet
-                    if totalMinutes > 0 {
-                        HStack(spacing: 8) {
-                            Image(systemName: "clock.fill")
-                            Text("\(totalMinutes) min au volant")
-                                .font(.headline)
-                            if num(tApproche) > 0 {
-                                Text("dont \(Int(num(tApproche))) min d'approche")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12)
-                        .background(Color.white.opacity(0.06))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    // La carte en premier
+                    if let r = result {
+                        VerdictBanner(result: r, settings: settings, input: input)
+                    } else {
+                        Text("Entre le prix, la distance et la durée de la course pour voir le verdict.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
 
-                    GroupBox {
+                    DisclosureGroup {
                         VStack(spacing: 12) {
                             Field(label: "Prix affiché (€)", text: $prix)
                             HStack(spacing: 10) {
@@ -72,19 +70,17 @@ struct ContentView: View {
                                 }
                             }
                             .tint(.green)
+                            Text("Sans adresses, la durée est estimée au min/km des réglages, jamais en verdict vert.")
+                                .font(.caption2).foregroundStyle(.secondary)
                         }
-                        .padding(.top, 4)
+                        .padding(.top, 8)
                     } label: {
-                        Text("LA COURSE").font(.caption).foregroundStyle(.secondary)
+                        Text("Saisie manuelle (secours)")
+                            .font(.callout).fontWeight(.semibold)
                     }
-
-                    if let r = result {
-                        VerdictBanner(result: r, settings: settings)
-                    } else {
-                        Text("Entre le prix, la distance et la durée de la course pour voir le verdict.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
+                    .padding(14)
+                    .background(Color.white.opacity(0.06))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
 
                     Button { showSettings.toggle() } label: {
                         HStack {
@@ -135,6 +131,11 @@ struct ContentView: View {
                                 Stepper(value: $cible, in: 1...60, step: 1) {
                                     LabeledContent("Objectif (€/h net)", value: fr(cible, 0))
                                 }
+                                Stepper(value: $minParKm, in: 1.5...6, step: 0.5) {
+                                    LabeledContent("Min/km de secours", value: fr(minParKm, 1))
+                                }
+                                Text("Le min/km de secours sert uniquement quand Apple Plans ne peut pas calculer la durée : le verdict n'est alors jamais vert.")
+                                    .font(.caption).foregroundStyle(.secondary)
                                 Text("Assurance, entretien, usure, abonnements : mets-les dans les charges fixes, elles sont ramenées au kilomètre.")
                                     .font(.caption).foregroundStyle(.secondary)
                             }
@@ -191,7 +192,7 @@ struct HelpView: View {
                     Label("Fais une capture d'écran de l'offre.", systemImage: "camera.viewfinder")
                     Label("Ouvre la capture, touche Partager, puis choisis CourseIQ.", systemImage: "square.and.arrow.up")
                     Label("Le verdict s'affiche tout de suite, avec le temps de trajet en premier.", systemImage: "bolt.fill")
-                    Text("Lecture sur l'appareil uniquement : la capture ne quitte jamais ton iPhone.")
+                    Text("L'image reste sur ton iPhone, seules les adresses sont envoyées à Apple Plans pour calculer la durée du trajet.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

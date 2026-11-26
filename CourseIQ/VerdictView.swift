@@ -3,6 +3,13 @@ import SwiftUI
 struct VerdictBanner: View {
     let result: AnalysisResult
     let settings: Settings
+    let input: RideInput?
+
+    init(result: AnalysisResult, settings: Settings, input: RideInput? = nil) {
+        self.result = result
+        self.settings = settings
+        self.input = input
+    }
 
     private var color: Color {
         switch result.verdict {
@@ -14,6 +21,21 @@ struct VerdictBanner: View {
 
     var body: some View {
         VStack(spacing: 14) {
+            // Pastille du haut : durée de la course uniquement (comme dans les vidéos)
+            HStack(spacing: 6) {
+                Image(systemName: "car.fill")
+                Text("CourseIQ · \(result.tCourse) min")
+                if result.estime {
+                    Text("· durée estimée")
+                }
+            }
+            .font(.system(size: 13, weight: .bold))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(Color.orange.opacity(0.15))
+            .overlay(Capsule().stroke(Color.orange.opacity(0.6), lineWidth: 1))
+            .clipShape(Capsule())
+
             // Panneau inspiré de Ride_IQ : prise en charge vs course
             HStack(spacing: 0) {
                 VStack(spacing: 4) {
@@ -39,14 +61,44 @@ struct VerdictBanner: View {
             .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.orange.opacity(0.5), lineWidth: 1))
             .clipShape(RoundedRectangle(cornerRadius: 14))
 
+            // Trajet : départ → arrivée, et note du client si lue
+            if let input, !input.adresseDepart.isEmpty || !input.adresseArrivee.isEmpty {
+                VStack(spacing: 4) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "mappin")
+                            .foregroundStyle(Color.orange)
+                        Text(input.adresseDepart.isEmpty ? "Départ non lu" : input.adresseDepart)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.down")
+                            .foregroundStyle(Color.orange)
+                        Text(input.adresseArrivee.isEmpty ? "Arrivée non lue" : input.adresseArrivee)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                        if input.note > 0 {
+                            Label(fr(input.note, 2), systemImage: "star.fill")
+                                .foregroundStyle(Color.orange)
+                        }
+                    }
+                }
+                .font(.footnote)
+            }
+
             VStack(spacing: 6) {
                 Text(result.verdict.label)
                     .font(.system(size: 28, weight: .heavy))
                 Text((result.net >= 0 ? "+" : "−") + fr(abs(result.net)) + " €")
                     .font(.system(size: 42, weight: .heavy))
-                Text("net après tous les coûts")
+                Text("net après tous les coûts, sur \(result.minutes) min au volant")
                     .font(.subheadline)
                     .opacity(0.8)
+                if result.estime {
+                    Text("Durée estimée (Apple Plans indisponible) : pas de verdict vert par prudence.")
+                        .font(.caption)
+                        .opacity(0.9)
+                }
             }
             .foregroundStyle(color)
             .frame(maxWidth: .infinity)
@@ -62,8 +114,15 @@ struct VerdictBanner: View {
             }
 
             VStack(alignment: .leading, spacing: 0) {
-                DeductLine(name: "Commission plateforme (\(fr(settings.tauxCom, 1)) %)",
-                           value: "−" + fr(result.commission) + " €")
+                if let input {
+                    DeductLine(name: "Prix affiché", value: fr(input.prix) + " €")
+                }
+                if input?.netFrais == true {
+                    DeductLine(name: "Commission déjà déduite (montant net de frais)", value: "0,00 €")
+                } else {
+                    DeductLine(name: "Commission plateforme (\(fr(settings.tauxCom, 1)) %)",
+                               value: "−" + fr(result.commission) + " €")
+                }
                 DeductLine(name: settings.motor == .electrique ? "Électricité" : "Carburant",
                            value: "−" + fr(result.carburant) + " €")
                 DeductLine(name: "Charges fixes (au km)", value: "−" + fr(result.fixes) + " €")
@@ -80,6 +139,10 @@ struct VerdictBanner: View {
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .padding(14)
+        .background(Color(red: 0.05, green: 0.06, blue: 0.09))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.12), lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
     }
 
 }

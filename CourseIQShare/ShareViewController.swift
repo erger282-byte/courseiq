@@ -46,7 +46,8 @@ final class ShareViewController: UIViewController {
                 guard let self else { return }
                 let input = Analyzer.parseOffer(text: text)
                 if input.prix > 0 || input.dCourse > 0 {
-                    self.show(.parsed(input, text))
+                    self.show(.loading)
+                    self.route(input)
                 } else {
                     self.show(.failure("Je n'ai rien réussi à lire sur cette capture. Essaie une capture nette de l'offre."))
                 }
@@ -61,15 +62,35 @@ final class ShareViewController: UIViewController {
         }
     }
 
+    /// Calcule la durée de la course avec Apple Plans (calculateETA, trafic prévu pris en compte).
+    /// Si le calcul échoue ou qu'une adresse manque : repli min/km réglable, marqué « durée estimée ».
+    private func route(_ input: RideInput) {
+        let settings = Settings()
+        Task { [weak self] in
+            var final = input
+            if let duree = await RouteService.dureeCourse(depart: input.adresseDepart,
+                                                          arrivee: input.adresseArrivee,
+                                                          kmCourse: input.dCourse,
+                                                          minParKm: settings.minParKm) {
+                final.tCourse = Double(duree.minutes)
+                final.tCourseEstime = duree.estime
+            }
+            await MainActor.run { self?.show(.parsed(final)) }
+        }
+    }
+
     private enum Outcome {
-        case parsed(RideInput, String)
+        case loading
+        case parsed(RideInput)
         case failure(String)
     }
 
     private func show(_ outcome: Outcome) {
         let root: AnyView
         switch outcome {
-        case .parsed(let input, _):
+        case .loading:
+            root = AnyView(ShareLoadingView())
+        case .parsed(let input):
             root = AnyView(ShareVerdictView(input: input, onClose: { [weak self] in
                 self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
             }))
@@ -83,8 +104,26 @@ final class ShareViewController: UIViewController {
         host.view.frame = view.bounds
         host.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         host.view.backgroundColor = .clear
+        view.subviews.forEach { $0.removeFromSuperview() }
         view.addSubview(host.view)
         host.didMove(toParent: self)
+    }
+}
+
+private struct ShareLoadingView: View {
+    var body: some View {
+        VStack(spacing: 14) {
+            Spacer()
+            ProgressView().tint(.white).scaleEffect(1.4)
+            Text("Analyse en cours…").font(.headline)
+            Text("Lecture de la capture, puis calcul de la durée du trajet avec Apple Plans.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Spacer()
+        }
+        .padding(24)
+        .foregroundStyle(.white)
     }
 }
 
@@ -96,20 +135,18 @@ private struct ShareVerdictView: View {
     private let settings = Settings()
 
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 12) {
             HStack {
                 Text("CourseIQ").font(.headline)
                 Spacer()
                 Button("Fermer", action: onClose)
             }
-            let minutes = Int(input.tCourse + input.tApproche)
-            if minutes > 0 {
-                Label("\(minutes) min au volant, dont \(Int(input.tApproche)) min d'approche", systemImage: "clock.fill")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
             if let r = Analyzer.analyse(settings, input) {
-                VerdictBanner(result: r, settings: settings)
-                Text("Réglages par défaut (essence, 7 L/100, 25 % de commission, objectif 20 €/h). Ajuste-les dans l'app CourseIQ.")
+                VerdictBanner(result: r, settings: settings, input: input)
+                Text("L'image reste sur ton iPhone, seules les adresses sont envoyées à Apple Plans pour calculer la durée du trajet.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text("Réglages par défaut (essence, 7 L/100, 25 % de commission, objectif 20 €/h, secours \(fr(settings.minParKm, 1)) min/km). Ajuste-les dans l'app CourseIQ.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             } else {
